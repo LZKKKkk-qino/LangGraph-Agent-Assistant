@@ -244,7 +244,7 @@ make lint
 | [智谱 AI](https://open.bigmodel.cn/) | 云端 LLM |
 | [Qwen](https://github.com/Qwen/Qwen) | 本地 LLM |
 
-## 🔐 安全说明
+## 🔐 安全说明 
 
 - `.env` 文件包含敏感信息，已加入 `.gitignore`
 - 上传前请确认 `.env` 不被提交
@@ -261,4 +261,4 @@ MIT License
 ## 📮 联系方式
 
 - GitHub: https://github.com/LZKKKkk-qino
--  Gmail:    865476367ss@gmail.com
+-  Gmail: 865476367ss@gmail.com
