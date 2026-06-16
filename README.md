@@ -208,7 +208,7 @@ src/agent/
 ├── my_llm.py              # LLM 配置
 ├── graph.py               # LangGraph 模板
 ├── graph3.py              # 基础 Agent 版本
-├── graph4_prebuild_node.py  # ToolNode 版本
+├── graph4_*.py            # Langgraph Prebulid ToolNode 版本
 ├── graph5_*.py            # interrupt_before 实验
 ├── graph6_*.py            # Command + interrupt 优化
 ├── graph7_ui.py           # 主版本（Gradio UI）
