@@ -2,6 +2,15 @@
 
 一个基于 LangGraph 构建的智能 Agent 助手，支持多 LLM 切换、MCP 工具集成和可控的工具调用流程。
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2.6+-purple.svg)](https://github.com/langchain-ai/langgraph)
+[![Gradio](https://img.shields.io/badge/Gradio-WebUI-orange.svg)](https://gradio.app/)
+[![LangSmith](https://img.shields.io/badge/LangSmith-Tracking-green.svg)](https://smith.langchain.com/)
+[![Qwen](https://img.shields.io/badge/Qwen-Local_LLM-blue.svg)](https://github.com/Qwen/Qwen)
+[![智谱AI](https://img.shields.io/badge/智谱AI-Cloud_LLM-blueviolet.svg)](https://open.bigmodel.cn/)
+[![MCP](https://img.shields.io/badge/MCP-Protocol-red.svg)](https://modelcontextprotocol.io/)
+
 ## ✨ 特性
 
 - 🤖 **多 LLM 支持**：无缝切换本地 LLM 模型与云端 API
@@ -142,6 +151,8 @@ python server_run.py
 | `GET /v1/models` | 获取可用模型列表 |
 | `POST /v1/chat/completions` | 聊天补全（支持流式） |
 
+> 💡 想了解更多本地 LLM 部署的详细信息，请访问：[local-llm-server 项目](https://github.com/LZKKKkk-qino/local-llm-server)
+
 #### 5. 连接 LangGraph Agent
 
 在 `.env` 文件中配置本地 LLM：
@@ -232,17 +243,6 @@ make format
 # 代码检查
 make lint
 ```
-
-## 🎯 技术栈
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2.6+-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Gradio](https://img.shields.io/badge/Gradio-WebUI-orange.svg)](https://gradio.app/)
-[![LangSmith](https://img.shields.io/badge/LangSmith-Tracking-green.svg)](https://smith.langchain.com/)
-[![Qwen](https://img.shields.io/badge/Qwen-Local_LLM-blue.svg)](https://github.com/Qwen/Qwen)
-[![智谱AI](https://img.shields.io/badge/智谱AI-Cloud_LLM-blueviolet.svg)](https://open.bigmodel.cn/)
-[![MCP](https://img.shields.io/badge/MCP-Protocol-red.svg)](https://modelcontextprotocol.io/)
 
 ## 🔐 安全说明 
 
