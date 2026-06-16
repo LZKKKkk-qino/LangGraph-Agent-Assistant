@@ -10,11 +10,11 @@ llm = ChatOpenAI(
 )
 
 
-base_url = "http://127.0.0.1:6006/v1/"
-llm = ChatOpenAI(
-    temperature=0.1,
-    model="Qwen3-8B",
-    api_key='KEY',
-    base_url=base_url
-)
+# base_url = "http://127.0.0.1:6006/v1/"
+# llm = ChatOpenAI(
+#     temperature=0.1,
+#     model="Qwen3-8B",
+#     api_key='KEY',
+#     base_url=base_url
+# )
 

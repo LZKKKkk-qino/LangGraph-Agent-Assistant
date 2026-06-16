@@ -4,7 +4,7 @@
 
 ## ✨ 特性
 
-- 🤖 **多 LLM 支持**：无缝切换本地 Qwen 模型与云端智谱 API
+- 🤖 **多 LLM 支持**：无缝切换本地 LLM 模型与云端 API
 - 🔧 **MCP 工具集成**：通过 Model Context Protocol 集成多种工具（搜索、爬虫、可视化等）
 - 🛡️ **工具调用确认**：使用 LangGraph 的 `interrupt` 机制，对敏感工具调用进行用户确认
 - 🎨 **Gradio 交互界面**：提供友好的 Web UI，支持流式对话
@@ -17,19 +17,19 @@
 </div>
 
 ```
-用户输入 → Chatbot 节点 → 工具调用判断 → Tools 节点 → 返回结果
+用户输入 → Agent 节点 → 工具调用判断 → Tools 节点 → 返回结果
                   ↓                                     ↓
             LLM (可配置)                        MCP 工具执行
 ```
 
 ### 核心组件
 
-| 组件 | 说明 |
-|------|------|
-| **Chatbot 节点** | 接收消息，调用 LLM 生成回复或工具调用请求 |
-| **Tools 节点** | 执行 LLM 请求的工具调用，支持同步/异步适配 |
+| 组件             | 说明 |
+|----------------|------|
+| **Agent 节点**   | 接收消息，调用 LLM 生成回复或工具调用请求 |
+| **Tools 节点**   | 执行 LLM 请求的工具调用，支持同步/异步适配 |
 | **MCP Client** | 连接多个 MCP 服务器，动态获取可用工具 |
-| **路由函数** | 根据 LLM 输出判断是否需要调用工具 |
+| **路由函数**       | 根据 LLM 输出判断是否需要调用工具 |
 
 ## 🚀 快速开始
 
@@ -37,7 +37,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/langgraph-agent-assistant.git
+git clone https://github.com/LZKKKkk-qino/LangGraph-Agent-Assistant
 cd langgraph-agent-assistant
 
 # 安装依赖
@@ -57,9 +57,9 @@ cp .env.example .env
 # LLM 配置（选择一种）
 
 # 方式一：本地 Qwen 模型（推荐用于私有化部署）
-LOCAL_LLM_BASE_URL=http://127.0.0.1:6006/v1/
-LOCAL_LLM_MODEL=Qwen3-8B
-LOCAL_LLM_API_KEY=your-key
+LOCAL_LLM_BASE_URL=http://127.0.0.1:6006/v1/ OR YOUR_LOCAL_LLM_BASE_URL
+LOCAL_LLM_MODEL=Qwen3-8B OR ANY_LOCAL_LLM_MODEL
+LOCAL_LLM_API_KEY=ANY
 
 # 方式二：智谱云端 API
 ZHIPU_API_KEY=your-zhipu-api-key
@@ -79,6 +79,98 @@ python src/agent/graph7_ui.py
 ```
 
 访问 http://localhost:7860 使用 Gradio 界面。
+
+<div align="center">
+  <img src="./static/graph7_gradio_ui.png" alt="Gradio UI" width="70%" />
+</div>
+
+## 🖥️ 本地 LLM 部署
+
+本项目集成了本地私有化部署方案，可通过 `employment/` 目录中的代码将本地 LLM 部署为符合 OpenAI API 规范的服务。
+
+### 部署架构
+
+```
+本地 GPU 服务器
+├── vLLM 引擎（加速推理）
+├── FastAPI 服务器（OpenAI 兼容 API）
+└── 支持模型：Qwen、GLM-4 等(可自行添加修改)
+```
+
+### 部署步骤
+
+#### 1. 安装依赖
+
+```bash
+pip install fastapi uvicorn vllm transformers pydantic sse-starlette
+```
+
+#### 2. 准备模型
+
+下载模型到本地，例如：
+
+```bash
+# Qwen3-8B
+git clone https://huggingface.co/Qwen/Qwen3-8B
+```
+
+#### 3. 配置环境变量
+
+```bash
+# 设置模型路径
+export MODEL_PATH=/path/to/your/model
+
+# Windows 下（PowerShell）
+$env:MODEL_PATH="D:\models\Qwen3-8B"
+```
+
+#### 4. 启动本地 API 服务
+
+```bash
+# 进入 employment 目录
+cd employment/scripts
+
+# 启动服务（端口 6006）
+python server_run.py
+```
+
+服务将在 `http://127.0.0.1:6006` 启动，提供以下接口：
+
+| 接口 | 说明 |
+|------|------|
+| `GET /health` | 健康检查 |
+| `GET /v1/models` | 获取可用模型列表 |
+| `POST /v1/chat/completions` | 聊天补全（支持流式） |
+
+#### 5. 连接 LangGraph Agent
+
+在 `.env` 文件中配置本地 LLM：
+
+```bash
+# 本地 Qwen 模型
+LOCAL_LLM_BASE_URL=http://127.0.0.1:6006/v1/
+LOCAL_LLM_MODEL=Qwen3-8B
+LOCAL_LLM_API_KEY=any
+```
+
+### 本地 API 特性
+
+| 特性 | 说明 |
+|------|------|
+| **OpenAI 兼容** | 完全兼容 OpenAI API 格式，可直接使用 LangChain 的 `ChatOpenAI` |
+| **流式输出** | 支持 SSE 流式返回，提升响应体验 |
+| **工具调用** | 支持 Function Calling，可与 LangGraph 无缝集成 |
+| **多并发** | 基于 vLLM，支持高并发推理 |
+| **GPU 优化** | 自动清理显存，支持 float16/bfloat16 |
+
+### 核心代码说明
+
+`employment/scripts/model_api_server.py` 包含以下核心功能：
+
+- **OpenAI 数据模型**：完全兼容的请求/响应结构
+- **消息处理**：支持 system/user/assistant/tool 角色转换
+- **工具调用解析**：自动识别和格式化 Function Calling
+- **流式生成器**：实时返回生成内容
 
 ## 📖 使用指南
 
@@ -121,7 +213,7 @@ src/agent/
 ├── graph6_*.py            # Command + interrupt 优化
 ├── graph7_ui.py           # 主版本（Gradio UI）
 └── tools/                 # 本地工具
-    └── tool_test1-test9.py # 去构建tool的不同方式
+    └── tool_test1-test9.py # 构建tool的不同方式
     
 ```
 
@@ -168,4 +260,4 @@ MIT License
 
 ## 📮 联系方式
 
-- GitHub: https://github.com/your-username
+- GitHub: https://github.com/LZKKKkk-qino

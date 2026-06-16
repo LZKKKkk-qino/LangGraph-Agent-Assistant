@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 from typing import Dict, Any, List
-from langchain_core.messages import ToolMessage, AIMessage, HumanMessage
+from langchain_core.messages import ToolMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import END, START
@@ -204,7 +204,7 @@ def route_tool_function(state: State) -> str:
     """
     动态路由函数，如果大模型输出后的AIMessges中有工具调用的请求，就进入tool节点执行工具调用
     """
-    print(state)
+    print(f"graph state:{state}")
     if isinstance(state, list):
         ai_message = state[-1]
     elif isinstance(state, dict) and (messages := state.get("messages", [])):
@@ -234,7 +234,7 @@ async def create_graph():
     async def chatbot(state: State):
         # state中新加入的message与之前对话的message一起传给LLM, 进而生成一条新的模型回复AIMessage
         messages = {'messages': [await llm_with_tools.ainvoke(state['messages'])]}
-        print(state)
+
         return messages
 
     builder.add_node('chatbot', chatbot)
@@ -276,7 +276,16 @@ def add_message(chat_history, user_message):
         chat_history.append({"role": "user", "content":user_message})
     return chat_history, gr.Textbox(value=None, interactive=False)
 
-async def submit_messages(chat_history: list[dict]) :  # 结果是新增AIMessage中content内容，或者是interrupt()中的value显示值的chat_history
+def set_prompt(chat_history, prompt_text):
+    gr.Info(f"✅ 系统提示词已设置")
+    # chat_history.append({"role": "system", "content": prompt_text},
+    #                      # {"role": "assistant", "content": '成功设置系统提示词'}
+    #                      )
+    # print(chat_history)
+    return chat_history
+
+
+async def submit_messages(chat_history: list[dict], user_prompt: list[dict]) :  # 结果是新增AIMessage中content内容，或者是interrupt()中的value显示值的chat_history
 
     content=''
     user_input = chat_history[-1]["content"]
@@ -297,8 +306,13 @@ async def submit_messages(chat_history: list[dict]) :  # 结果是新增AIMessag
         return chat_history
 
     else: # 正常输入 human message
+        messages = []
+        if user_prompt:
+             messages.append(SystemMessage(content=user_prompt))
+        messages.append(HumanMessage(content=user_input))
+        print(f"提交给大模型的输入：{messages}")
         async for chunk in graph.astream(
-                {'messages': [HumanMessage(content=user_input)]}, config, stream_mode='values'):
+                {'messages': messages}, config, stream_mode='values'):
             content = get_messages(chunk, content)
 
     # 检查中断点，在正常输入后第一次遇到中断点
@@ -317,15 +331,44 @@ async def submit_messages(chat_history: list[dict]) :  # 结果是新增AIMessag
 with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
 
     # 聊天历史记录框组件
-    chatbot = gr.Chatbot(type="messages", height=500, render_markdown=True, line_breaks=False)
+    chatbot = gr.Chatbot(height=500, render_markdown=True, line_breaks=False)
 
     # 用户输入框组件
-    chat_input = gr.Textbox(placeholder="你好！有什么可以帮助您", label="用户输入(input)", max_lines=5, container=False)
+    # chat_input = gr.Textbox(placeholder="你好！有什么可以帮助您", label="用户输入(input)", max_lines=5, container=False)
 
-    # 控制按钮组件
-    with gr.Row():
-        submit_buttton = gr.Button(value="发送", variant="primary")
-        clear_button = gr.Button("clear")
+    # # 控制按钮组件
+    # with gr.Row():
+    #     submit_buttton = gr.Button(value="发送", variant="primary")
+    #     clear_button = gr.Button("clear")
+    # 创建一个行布局
+    with gr.Row(equal_height=True):  #):  # 水平布局容器
+
+        # 创建一个列布局
+        with gr.Column(scale=3):  # 垂直布局容器
+            # 创建一个文本框用于用户输入
+            with gr.Column(scale=12):
+                chat_input = gr.Textbox(show_label=False, placeholder="你好！有什么可以帮助您", lines=12, container=False, submit_btn=True, stop_btn=True)
+            # 创建一个提交按钮
+            with gr.Column(min_width=32, scale=2):
+                submit_buttton = gr.Button(value="发送", variant="primary")  # 提交用户问题的 按钮
+
+        # 创建另一个列布局
+        with gr.Column(scale=1):
+            # 创建一个文本框用于输入提示词
+            prompt_input = gr.Textbox(show_label=False, placeholder="提示词", lines=12, container=False)
+            # 创建一个按钮用于设置提示词
+            pBtn = gr.Button("系统提示词设置")
+
+        # 创建第三个列布局
+        with gr.Column(scale=1):
+            # 创建一个滑块用于设置最大长度
+            max_length = gr.Slider(0, 32768, value=1024, step=1.0, label="最大长度", interactive=True)
+            # 创建一个滑块用于设置Top P值
+            top_p = gr.Slider(0, 1, value=0.8, step=0.01, label="Top P", interactive=True)
+            # 创建一个滑块用于设置温度
+            temperature = gr.Slider(0.01, 1, value=0.6, step=0.01, label="Temperature", interactive=True)
+            # 创建一个按钮用于清除聊天记录
+            clear_button = gr.Button("clear")
 
     # 消息提交处理链
     msg_handler = chat_input.submit(fn=add_message,
@@ -333,7 +376,7 @@ with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
                                     outputs=[chatbot, chat_input],
                                     queue=False
                                     ).then(fn=submit_messages,
-                                           inputs=chatbot,
+                                           inputs=[chatbot, prompt_input],
                                            outputs=chatbot,
                                            api_name="chat_stream"
                                            )
@@ -344,11 +387,15 @@ with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
                                           outputs=[chatbot, chat_input],
                                           queue=False
                                           ).then(fn=submit_messages,
-                                                 inputs=chatbot,
+                                                 inputs=[chatbot, prompt_input],
+                                                 # inputs=[chatbot, prompt_input, max_length, top_p, temperature],
                                                  outputs=chatbot
                                                  )
     # 对话清空处理
     clear_button.click(fn=lambda :[], inputs=None, outputs=chatbot, queue=False)
+
+    # 将设置提示词的函数绑定到按钮点击事件
+    pBtn.click(set_prompt, inputs=[chatbot,prompt_input], outputs=chatbot)
 
     # 重置输入框状态
     msg_handler.then(fn=lambda : gr.Textbox(interactive=True), inputs=None, outputs=[chat_input])
@@ -356,7 +403,6 @@ with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
 
 
 if __name__ == '__main__':
+    # To create a public link, set `share = True` in `launch()`.
     demo.launch()
-#
-# if __name__ == '__main__':
-#     asyncio.run(run_graph())
+

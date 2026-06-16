@@ -233,7 +233,7 @@ with gr.Blocks() as demo:  # gr.Blocks 是 Gradio 的顶级容器，用于创建
     gr.HTML("""<h1 align="center">七爷私有AI大模型Chatbot</h1>""")
 
     # 创建一个聊天机器人界面组件
-    chatbot = gr.Chatbot(type='messages')  # 聊天记录的视图组件
+    chatbot = gr.Chatbot()  # 聊天记录的视图组件
 
     # 创建一个行布局
     with gr.Row():  # 水平布局容器
