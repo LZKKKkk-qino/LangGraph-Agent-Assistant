@@ -1,4 +1,6 @@
 import asyncio
+
+import uuid
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.constants import END, START
@@ -65,6 +67,10 @@ mcp_lient = MultiServerMCPClient(
     }
 )
 
+config = {"configurable":
+              {"thread_id": str(uuid.uuid4())}
+          }
+
 class State(MessagesState):
     pass
 
@@ -89,8 +95,14 @@ async def create_graph():
     builder.add_edge(START, "agent")
     builder.add_edge('tools', "agent")
 
-    graph = builder.compile()
+    async with AsyncSqliteSaver.from_conn_string("checkpoint.db") as memory:
+
+        graph = builder.compile(checkpointer=memory)
+        result = await graph.ainvoke(input={"messages": [{"role": "human", "content": "今天深圳天气如何"}]},config=config)
+        print(result)
 
     return graph
+
+
 
 graph = asyncio.run(create_graph())
