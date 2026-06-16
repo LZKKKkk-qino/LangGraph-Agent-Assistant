@@ -235,14 +235,14 @@ make lint
 
 ## 🎯 技术栈
 
-| 技术 | 用途 |
-|------|------|
-| [LangGraph](https://github.com/langchain-ai/langgraph) | Agent 工作流编排 |
-| [langchain-mcp-adapters](https://github.com/langchain-ai/langchain-mcp-adapters) | MCP 协议适配 |
-| [Gradio](https://gradio.app/) | Web UI |
-| [LangSmith](https://smith.langchain.com/) | 追踪与可视化 |
-| [智谱 AI](https://open.bigmodel.cn/) | 云端 LLM |
-| [Qwen](https://github.com/Qwen/Qwen) | 本地 LLM |
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2.6+-purple.svg)](https://github.com/langchain-ai/langgraph)
+[![Gradio](https://img.shields.io/badge/Gradio-WebUI-orange.svg)](https://gradio.app/)
+[![LangSmith](https://img.shields.io/badge/LangSmith-Tracking-green.svg)](https://smith.langchain.com/)
+[![Qwen](https://img.shields.io/badge/Qwen-Local_LLM-blue.svg)](https://github.com/Qwen/Qwen)
+[![智谱AI](https://img.shields.io/badge/智谱AI-Cloud_LLM-blueviolet.svg)](https://open.bigmodel.cn/)
+[![MCP](https://img.shields.io/badge/MCP-Protocol-red.svg)](https://modelcontextprotocol.io/)
 
 ## 🔐 安全说明 
 
