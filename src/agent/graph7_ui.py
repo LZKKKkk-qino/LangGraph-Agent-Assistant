@@ -1,10 +1,13 @@
 import asyncio
 import json
+import os
 import uuid
 from typing import Dict, Any, List
 from langchain_core.messages import ToolMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.types import interrupt, Command
@@ -13,6 +16,7 @@ from get_env import ZHIPU_API_KEY
 from src.agent.my_llm import llm
 from src.agent.tools.tool_test4 import calculate
 from src.agent.tools.tool_test6 import runnable_tool
+import time
 
 # 配置 mcp
 
@@ -197,9 +201,6 @@ class State(MessagesState):
     pass
 
 
-
-
-
 def route_tool_function(state: State) -> str:
     """
     动态路由函数，如果大模型输出后的AIMessges中有工具调用的请求，就进入tool节点执行工具调用
@@ -224,6 +225,7 @@ def route_tool_function(state: State) -> str:
 
 
 async def create_graph():
+
     tools = await mcp_lient.get_tools()
     tools.extend([calculate, runnable_tool])
 
@@ -248,9 +250,11 @@ async def create_graph():
     builder.add_edge('tools', 'chatbot')
 
     memory = MemorySaver()
+
     graph = builder.compile(checkpointer=memory)
 
     return graph
+
 
 graph = asyncio.run(create_graph())
 
@@ -271,10 +275,12 @@ def get_messages(state, content=''):
 
     return content
 
+
 def add_message(chat_history, user_message):
     if user_message:
         chat_history.append({"role": "user", "content":user_message})
     return chat_history, gr.Textbox(value=None, interactive=False)
+
 
 def set_prompt(chat_history, prompt_text):
     gr.Info(f"✅ 系统提示词已设置")
@@ -333,13 +339,6 @@ with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
     # 聊天历史记录框组件
     chatbot = gr.Chatbot(height=500, render_markdown=True, line_breaks=False)
 
-    # 用户输入框组件
-    # chat_input = gr.Textbox(placeholder="你好！有什么可以帮助您", label="用户输入(input)", max_lines=5, container=False)
-
-    # # 控制按钮组件
-    # with gr.Row():
-    #     submit_buttton = gr.Button(value="发送", variant="primary")
-    #     clear_button = gr.Button("clear")
     # 创建一个行布局
     with gr.Row(equal_height=True):  #):  # 水平布局容器
 
