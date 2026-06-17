@@ -9,6 +9,15 @@ llm = ChatOpenAI(
     base_url="https://open.bigmodel.cn/api/paas/v4/"
 )
 
+# 多模态 LLM（支持图片理解）
+multimodal_llm = ChatOpenAI(
+    temperature=0.1,
+    # model="glm-4.6v-flash",
+    model="glm-4.5v",
+    api_key=ZHIPU_API_KEY,
+    base_url="https://open.bigmodel.cn/api/paas/v4/"
+)
+
 
 # base_url = "http://127.0.0.1:6006/v1/"
 # llm = ChatOpenAI(

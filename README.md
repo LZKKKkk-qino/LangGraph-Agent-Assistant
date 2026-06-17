@@ -15,6 +15,8 @@
 
 - 🤖 **多 LLM 支持**：无缝切换本地 LLM 模型与云端 API
 - 🔧 **MCP 工具集成**：通过 Model Context Protocol 集成多种工具（搜索、爬虫、可视化等）
+- 🎥 **多模态支持**：支持文本、图片、视频、音频、文件等多种输入形式，通过 `graph8_mutimodal_ui.py` 实现多模态大模型 Agent
+- 🛠️ **自定义 ToolNode**：不依赖 LangGraph 预置的 ToolNode，用户可通过代码自行定义工具执行逻辑，实现更灵活的工具调用控制
 - 🛡️ **工具调用确认**：使用 LangGraph 的 `interrupt` 机制，对敏感工具调用进行用户确认
 - 🎨 **Gradio 交互界面**：提供友好的 Web UI，支持流式对话
 - 📊 **LangSmith 可视化**：支持在 LangGraph Studio 中可视化调试
@@ -36,9 +38,66 @@
 | 组件             | 说明 |
 |----------------|------|
 | **Agent 节点**   | 接收消息，调用 LLM 生成回复或工具调用请求 |
-| **Tools 节点**   | 执行 LLM 请求的工具调用，支持同步/异步适配 |
+| **自定义 Tools 节点**   | 自定义实现而非使用 LangGraph 预置 ToolNode，允许用户完全控制工具执行的逻辑、错误处理和结果处理 |
 | **MCP Client** | 连接多个 MCP 服务器，动态获取可用工具 |
 | **路由函数**       | 根据 LLM 输出判断是否需要调用工具 |
+
+### 🛠️ 自定义 ToolNode 设计
+
+本项目采用**自定义 ToolNode** 而非 LangGraph 预置的 `ToolNode`，这一设计带来了以下优势：
+
+| 优势 | 说明 |
+|------|------|
+| **完全自主控制** | 工具执行逻辑完全由用户代码定义，不受预置 API 限制 |
+| **灵活的错误处理** | 可根据不同工具类型实现差异化的错误恢复和重试策略 |
+| **深度定制** | 支持在工具执行前后插入自定义逻辑（如日志记录、权限验证、参数校验） |
+| **异步适配** | 原生支持同步/异步工具的统一调用接口 |
+| **易于扩展** | 添加新工具类型或修改现有工具行为无需依赖框架更新 |
+
+#### 自定义 ToolNode 示例
+
+```python
+def tool_node(state):
+    """
+    自定义 ToolNode 实现
+    用户可以在此处完全自定义工具执行的逻辑
+    """
+    tool_calls = state["messages"][-1].tool_calls
+    results = []
+
+    for tool_call in tool_calls:
+        # 1. 自定义参数校验
+        if not validate_tool_args(tool_call):
+            results.append(
+                {
+                    "role": "tool",
+                    "content": "参数校验失败",
+                    "tool_call_id": tool_call["id"]
+                }
+            )
+            continue
+
+        # 2. 自定义工具执行逻辑
+        try:
+            tool_output = execute_tool_with_custom_logic(tool_call)
+            results.append({
+                "role": "tool",
+                "content": tool_output,
+                "tool_call_id": tool_call["id"]
+            })
+        except Exception as e:
+            # 3. 自定义错误处理
+            results.append({
+                "role": "tool",
+                "content": f"工具执行失败: {str(e)}",
+                "tool_call_id": tool_call["id"],
+                "is_error": True
+            })
+
+    return {"messages": results}
+```
+
+用户可以根据实际需求修改上述代码，实现完全个性化的工具调用流程。
 
 ## 🚀 快速开始
 
@@ -70,12 +129,17 @@ LOCAL_LLM_BASE_URL=http://127.0.0.1:6006/v1/ OR YOUR_LOCAL_LLM_BASE_URL
 LOCAL_LLM_MODEL=Qwen3-8B OR ANY_LOCAL_LLM_MODEL
 LOCAL_LLM_API_KEY=ANY
 
-# 方式二：智谱云端 API
+# 方式二：智谱云端 API（支持文本对话）
 ZHIPU_API_KEY=your-zhipu-api-key
+
+# 方式三：Google Gemini API（多模态支持）
+GEMINI_API_KEY=your-gemini-api-key
 
 # 可选：LangSmith 追踪
 LANGSMITH_API_KEY=lsv2...
 ```
+
+> 💡 **多模态支持**：使用 `graph8_mutimodal_ui.py` 启动多模态版本时，需要配置支持多模态的 LLM API（如智谱 GLM-4.5v、Google Gemini Pro Vision 等）。
 
 ### 3. 启动服务
 
@@ -83,14 +147,25 @@ LANGSMITH_API_KEY=lsv2...
 # 启动 LangGraph Server
 langgraph dev
 
-# 或直接启动 Gradio UI
-python src/agent/graph7_ui.py
+# 启动文本对话版本（Gradio UI）
+python src/agent/graph7_textonly_ui.py
+
+# 启动多模态版本（支持文本/图片/视频/音频/文件输入）
+python src/agent/graph8_mutimodal_ui.py
 ```
 
 访问 http://localhost:7860 使用 Gradio 界面。
 
+#### 多模态界面 (Graph 8)
+
 <div align="center">
-  <img src="./static/graph7_gradio_ui.png" alt="Gradio UI" width="70%" />
+  <img src="./static/graph8_gradio_ui.png" alt="Multimodal Gradio UI" width="70%" />
+</div>
+
+#### 文本对话界面 (Graph 7)
+
+<div align="center">
+  <img src="./static/graph7_gradio_ui.png" alt="Text-only Gradio UI" width="70%" />
 </div>
 
 ## 🖥️ 本地 LLM 部署
@@ -171,6 +246,7 @@ LOCAL_LLM_API_KEY=any
 | **OpenAI 兼容** | 完全兼容 OpenAI API 格式，可直接使用 LangChain 的 `ChatOpenAI` |
 | **流式输出** | 支持 SSE 流式返回，提升响应体验 |
 | **工具调用** | 支持 Function Calling，可与 LangGraph 无缝集成 |
+| **多模态支持** | 支持多模态大模型，通过 `graph8_mutimodal_ui.py` 启用 |
 | **多并发** | 基于 vLLM，支持高并发推理 |
 | **GPU 优化** | 自动清理显存，支持 float16/bfloat16 |
 
@@ -184,6 +260,41 @@ LOCAL_LLM_API_KEY=any
 - **流式生成器**：实时返回生成内容
 
 ## 📖 使用指南
+
+### 🎥 多模态功能 (Graph 8)
+
+`graph8_mutimodal_ui.py` 提供了完整的多模态支持，允许用户通过多种形式与 Agent 交互：
+
+| 支持的输入类型 | 说明 |
+|--------------|------|
+| **文本** | 支持常规文本对话输入 |
+| **图片** | 支持 PNG、JPEG、JPG、WEBP 格式，可进行图片理解和分析 |
+| **音频** | 支持 MP3、WAV、M4A 格式，可进行语音识别和音频理解 |
+| **视频** | 支持 MP4、AVI、MOV、MKV 格式，可进行视频内容理解 |
+| **文件** | 支持各种文本文件，自动读取文件内容 |
+
+#### 多模态输入示例
+
+```
+用户：[上传一张图片] + "这张图片里有什么？"
+Agent：[识别图片内容并描述]
+
+用户：[上传一个视频] + "请总结这个视频的主要内容"
+Agent：[分析视频并生成摘要]
+
+用户：[上传一份PDF] + "请帮我提取这份文档的关键信息"
+Agent：[读取文件并提取关键内容]
+```
+
+#### 文件处理逻辑
+
+系统会根据文件类型自动进行不同的处理：
+
+- **图片文件**：转换为 Base64 编码，通过 `image_url` 类型传递给模型
+- **音频文件**：转换为 Base64 编码的 WAV 格式，通过 `audio_url` 类型传递
+- **视频文件**：直接使用文件路径，通过 `video_url` 类型传递
+- **文本文件**：读取文件内容，通过 `text` 类型传递
+- **其他文件**：仅显示文件名信息
 
 ### 工具调用确认流程
 
@@ -222,10 +333,11 @@ src/agent/
 ├── graph4_*.py            # Langgraph Prebulid ToolNode 版本
 ├── graph5_*.py            # interrupt_before 实验
 ├── graph6_*.py            # Command + interrupt 优化
-├── graph7_ui.py           # 主版本（Gradio UI）
+├── graph7_textonly_ui.py  # 文本对话版本（Gradio UI）
+├── graph8_mutimodal_ui.py # 多模态版本（支持文本/图片/视频/音频/文件）
 └── tools/                 # 本地工具
     └── tool_test1-test9.py # 构建tool的不同方式
-    
+
 ```
 
 ### 运行测试
