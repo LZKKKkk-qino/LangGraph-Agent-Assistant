@@ -18,6 +18,8 @@
 - 🎥 **多模态支持**：支持文本、图片、视频、音频、文件等多种输入形式，通过 `graph8_mutimodal_ui.py` 实现多模态大模型 Agent
 - 🛠️ **自定义 ToolNode**：不依赖 LangGraph 预置的 ToolNode，用户可通过代码自行定义工具执行逻辑，实现更灵活的工具调用控制
 - 🛡️ **工具调用确认**：使用 LangGraph 的 `interrupt` 机制，对敏感工具调用进行用户确认
+- 🔄 **流式/非流式切换**：支持流式和非流式两种输出模式，可根据 LLM 配置自动切换，提升用户体验
+- 📁 **工具结果折叠展示**：通过 metadata 对 ToolMessage 进行特殊处理，在 UI 中以可折叠卡片形式展示工具调用结果，保持界面整洁
 - 🎨 **Gradio 交互界面**：提供友好的 Web UI，支持流式对话
 - 📊 **LangSmith 可视化**：支持在 LangGraph Studio 中可视化调试
 
@@ -295,6 +297,39 @@ Agent：[读取文件并提取关键内容]
 - **视频文件**：直接使用文件路径，通过 `video_url` 类型传递
 - **文本文件**：读取文件内容，通过 `text` 类型传递
 - **其他文件**：仅显示文件名信息
+
+#### 🔄 流式/非流式切换
+
+Graph 8 支持根据 LLM 配置自动切换流式和非流式输出模式：
+
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| **流式输出** | 逐 token 实时显示模型回复，使用 `stream_mode=['messages','updates']` | 需要实时查看生成过程 |
+| **非流式输出** | 整体输出模型回复，使用 `stream_mode=['values','updates']` | 需要等待完整响应 |
+
+配置方式：
+```python
+# 在 src/agent/my_llm.py 中设置
+multimodal_llm = ChatOpenAI(
+    model="glm-4.5v",
+    streaming=True  # 设为 True 启用流式，False 使用非流式
+)
+```
+
+#### 📁 工具结果折叠展示
+
+在流式和非流式模式下，工具调用结果会以可折叠卡片的形式展示：
+
+```python
+# 工具消息带有 metadata
+chat_history.append({
+    "role": "assistant",
+    "content": tool_msg_content,
+    "metadata": {"title": f'🛠️ 正在使用工具：{message.name}'}
+})
+```
+
+这样可以将详细的工具执行结果折叠起来，保持界面整洁，用户可点击展开查看详情。
 
 ### 工具调用确认流程
 

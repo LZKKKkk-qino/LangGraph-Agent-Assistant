@@ -15,7 +15,8 @@ multimodal_llm = ChatOpenAI(
     # model="glm-4.6v-flash",
     model="glm-4.5v",
     api_key=ZHIPU_API_KEY,
-    base_url="https://open.bigmodel.cn/api/paas/v4/"
+    base_url="https://open.bigmodel.cn/api/paas/v4/",
+    streaming=True
 )
 
 

@@ -3,12 +3,10 @@ import json
 import os
 import uuid
 import base64
-from typing import Dict, Any, List
-from langchain_core.messages import ToolMessage, AIMessage, HumanMessage, SystemMessage
+from typing import Dict, Any, List, Optional
+from langchain_core.messages import ToolMessage, AIMessage, HumanMessage, SystemMessage, ChatMessage, AIMessageChunk
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.types import interrupt, Command
@@ -206,7 +204,7 @@ def route_tool_function(state: State) -> str:
     """
     动态路由函数，如果大模型输出后的AIMessges中有工具调用的请求，就进入tool节点执行工具调用
     """
-    print(f"graph state:{state}")
+    print(f"route_function state:{state}")
     if isinstance(state, list):
         ai_message = state[-1]
     elif isinstance(state, dict) and (messages := state.get("messages", [])):
@@ -228,13 +226,16 @@ def route_tool_function(state: State) -> str:
 async def create_graph():
 
     tools = await mcp_lient.get_tools()
-    # tools.extend([calculate, runnable_tool])
-    print(tools)
+    tools.extend([calculate, runnable_tool])
+    print(f"获取到的工具列表: {tools}")
+
     builder = StateGraph(State)
 
-    llm_with_tools = multimodal_llm.bind_tools(tools)
+    # 只在有工具时才绑定工具，避免模型在没有工具时产生意外的工具调用行为
+    llm_with_tools = multimodal_llm.bind_tools(tools,strict=True) if tools else multimodal_llm
 
     async def chatbot(state: State):
+        print(f"llm input state:{state}")
         # state中新加入的message与之前对话的message一起传给LLM, 进而生成一条新的模型回复AIMessage
         messages = {'messages': [await llm_with_tools.ainvoke(state['messages'])]}
 
@@ -376,10 +377,10 @@ def read_file(file_path):
         file_message = {"type": "text", "text": f"[文件] {os.path.basename(file_path)}"}
     return file_message
 
+print(multimodal_llm.streaming)
 
 
-
-async def submit_messages(chat_history: list[dict], user_prompt: list[dict]) :  # 结果是新增AIMessage中content内容，或者是interrupt()中的value显示值的chat_history
+async def submit_messages_stream(chat_history: list[dict] , user_prompt: list[dict]) :  # 结果是新增AIMessage中content内容，或者是interrupt()中的value显示值的chat_history
 
     content=''
     # user_input = chat_history[-1]['content'] if chat_history else ''
@@ -387,7 +388,7 @@ async def submit_messages(chat_history: list[dict], user_prompt: list[dict]) :  
 
     # 如果用户提交的内容是空的，则不做改动
     if not user_messages:
-        return chat_history
+        yield chat_history
 
     user_input = []
     if user_messages:
@@ -437,17 +438,58 @@ async def submit_messages(chat_history: list[dict], user_prompt: list[dict]) :  
         async for chunk in graph.astream(human_command, config, stream_mode='values'):
             content = get_messages(chunk, content)           # 将用户决定发送给模型,得到模型回复
             chat_history.append(gr.ChatMessage(role="assistant", content=content))
-        return chat_history
+        yield chat_history
+        # pass
 
     else: # 正常输入 human message
         messages = []
         if user_prompt:
-             messages.append(SystemMessage(content=user_prompt))
+            messages.append(SystemMessage(content=user_prompt))
         messages.append(HumanMessage(content=user_input))
         print(f"提交给大模型的输入：{messages}")
+
+        full_response = ""  # 用于累积模型输出的完整文本
+        # 流式输出
         async for chunk in graph.astream(
-                {'messages': messages}, config, stream_mode='values'):
-            content = get_messages(chunk, content)
+                {'messages': messages}, config, stream_mode=['messages','updates']):
+
+            # 在 stream_mode='messages' 模式下，chunk 输出是 token by token
+            print(f"chunk: {chunk[1]}")
+            # chunk: ('messages', (AIMessageChunk(content='\n', ...),...))
+            chunk_messages = chunk[1]
+
+            # 获取 message
+            for message in chunk_messages:
+
+
+                # --- 1. 处理模型回复 (AIMessage) ---
+                if isinstance(message, AIMessageChunk):
+                    # 如果模型输出了文本内容
+                    if message.content:
+                        # print(f"模型回复：{message.content}")
+                        full_response += message.content
+
+                        # 核心逻辑：判断是否需要更新上一条消息，还是创建新消息
+                        # print(chat_history[-1])
+                        # print(chat_history[-1]['role'])
+                        if chat_history[-1] and chat_history[-1]['role'] == "assistant" and 'title' not in chat_history[-1]['metadata'] :
+                            # 情况A：上一条也是普通AI回复，更新内容
+                            chat_history[-1]["content"] = full_response
+                        else:
+                            # 情况B：上一条不是AIMessage，现在刚开始加入 AIMessage，创建新的AI回复消息
+                            chat_history.append({"role": "assistant", "content": full_response,"metadata": {}})
+
+                        yield chat_history
+
+                # --- 2. 处理工具调用 (ToolMessage) ---
+                elif isinstance(message, ToolMessage):
+                    tool_msg_content = f"调用工具：{message.name}\n结果：{message.content}"
+                    # 添加带有标题元数据的消息，Gradio 会将其渲染为折叠卡片
+                    chat_history.append({"role": "assistant", "content": tool_msg_content,
+                                         "metadata": {"title": f'🛠️ 正在使用工具：{message.name}'}})
+                    # 刷新response字符串，异步状态下，生成器不断返回也不会刷新，需要重置，避免工具调用前生成的内容再次重复
+                    full_response = ""
+                    yield chat_history
 
     # 检查中断点，在正常输入后第一次遇到中断点
     current_state = graph.get_state(config=config)
@@ -456,9 +498,115 @@ async def submit_messages(chat_history: list[dict], user_prompt: list[dict]) :  
     # 当工作流已经到达终点（END），或者不需要等待外部输入时，state.next 为 False。
     if current_state.next:
         content = current_state.interrupts[0].value  # 返回中断点中value参数设定好的内容
+        chat_history.append({"role": "assistant","content": content})
+    yield chat_history
 
-    chat_history.append(gr.ChatMessage(role="assistant", content=content))
-    return chat_history
+
+async def submit_messages_not_stream(chat_history: list[dict], user_prompt: list[dict]) :  # 结果是新增AIMessage中content内容，或者是interrupt()中的value显示值的chat_history
+
+    content=''
+    user_messages = get_all_latest_user_message(chat_history)
+
+    # 如果用户提交的内容是空的，则不做改动
+    if not user_messages:
+        yield chat_history
+
+    user_input = []
+    if user_messages:
+        for msg in user_messages:
+            for item in msg['content']:
+                item_type = item.get('type')
+
+                if item_type == 'text':
+                    user_input.append({'type': 'text', 'text': item['text']})
+
+                elif item_type == 'file':
+                    file_path = item['file']['path']
+
+                    # 音频文件转换为用户消息
+                    if file_path.lower().endswith(('.mp3', '.wav', '.m4a')):
+                        file_message = transcribe_audio(file_path)
+                        user_input.append(file_message)
+
+                    # 图片文件转换为用户消息
+                    elif file_path.lower().endswith(('.png', '.jpeg', '.jpg', '.webp')):
+                        file_message = transcribe_image(file_path)
+                        user_input.append(file_message)
+
+                    # 视频文件转换为用户消息
+                    elif file_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+                        file_message = transcribe_video(file_path)
+                        user_input.append(file_message)
+
+                    else:
+                        file_message = read_file(file_path)
+                        user_input.append(file_message)
+
+                else:
+                    pass
+
+
+    # 等待用户中断输入内容
+    # 不进行工具调用，可能继续提问或者给出拒绝理由
+    current_state = graph.get_state(config=config)
+    if current_state.next: # 有下一步,表示当前于工具节点处于中断状态, 没有进入 END 节点
+
+        human_command = Command(resume={'answer': user_input[0]['text']})  # 在中断点之后继续运行，输入进 interrupt 函数中，得到上面的 res
+
+        # 1. 若 Command 中的 answer 为 y，则进行工具调用
+        # 接着执行工作流，返回工具结果给LLM，完成全部工具调用且不再调用工具后，得到模型想给用户的最终输出 result ,就是这次用户提问模型通过调用工具后得到的最终结果
+        # 2. 若 Command 中的 answer 不为 y， 则工具节点返回我们设定好的 'messages' 作为 result 输出给 LLM，进而使LLM生成后直接进入 END 节点
+        async for chunk in graph.astream(human_command, config, stream_mode='values'):
+            content = get_messages(chunk, content)           # 将用户决定发送给模型,得到模型回复
+            chat_history.append(gr.ChatMessage(role="assistant", content=content))
+        yield chat_history
+
+    else: # 正常输入 human message
+        messages = []
+        if user_prompt:
+            messages.append(SystemMessage(content=user_prompt))
+        messages.append(HumanMessage(content=user_input))
+        print(f"提交给大模型的输入：{messages}")
+
+        # 流式输出
+        async for chunk in graph.astream(
+                {'messages': messages}, config, stream_mode=['values','updates']):
+
+            # 在 stream_mode='values' 模式下，chunk 输出是整体的输出，包含多个消息
+            # 获取 message
+            # print(f"chunk[1]：{chunk[1]}")
+            if chunk[1].get('messages'):
+                messages = chunk[1]['messages']
+                message = messages[-1]
+                # --- 1. 处理模型回复 (AIMessage) ---
+                if isinstance(message, AIMessage):
+                    # 如果模型输出了文本内容
+                    if message.content:
+                        print(f"模型回复：{message.content}")
+                        # 核心逻辑：判断是否需要更新上一条消息，还是创建新消息
+                        chat_history.append({"role": "assistant","content": message.content})
+
+                        yield chat_history
+
+                # --- 2. 处理工具调用 (ToolMessage) ---
+                elif isinstance(message, ToolMessage):
+                    tool_msg_content = f"调用工具：{message.name}\n结果：{message.content}"
+                    # 添加带有标题元数据的消息，Gradio 会将其渲染为折叠卡片
+                    chat_history.append({"role": "assistant", "content": tool_msg_content,
+                                         "metadata": {"title": f'🛠️ 正在使用工具：{message.name}'}})
+
+                    yield chat_history
+
+
+    # 检查中断点，在正常输入后第一次遇到中断点
+    current_state = graph.get_state(config=config)
+
+    # 有 state.next ,表示当前工作流处在节点 node 是中断状态, 且没有进入 END 节点
+    # 当工作流已经到达终点（END），或者不需要等待外部输入时，state.next 为 False。
+    if current_state.next:
+        content = current_state.interrupts[0].value  # 返回中断点中value参数设定好的内容
+        chat_history.append({"role": "assistant","content": content})
+    yield chat_history
 
 
 # 创建 Gradio 界面
@@ -505,6 +653,8 @@ with gr.Blocks(title="my assistant", theme=gr.themes.Soft()) as demo:
             temperature = gr.Slider(0.01, 1, value=0.6, step=0.01, label="Temperature", interactive=True)
             # 创建一个按钮用于清除聊天记录
             clear_button = gr.Button("clear")
+
+    submit_messages = submit_messages_stream if multimodal_llm.streaming else submit_messages_not_stream
 
     # 消息提交处理链
     msg_handler = chat_input.submit(fn=add_message,
