@@ -13,7 +13,7 @@
 [![Version](https://img.shields.io/badge/Version-v0.0.1-informational.svg)](https://github.com/LZKKKkk-qino/LangGraph-Agent-Assistant)
 [![Status](https://img.shields.io/badge/Status-Active-success.svg)](https://github.com/LZKKKkk-qino/LangGraph-Agent-Assistant)
 
-**基于 LangGraph 构建的企业级智能 Agent 框架**
+**基于 LangGraph 构建的智能 Agent 框架**
 
 支持多 LLM 切换、MCP 工具集成、多模态输入和可控的工具调用流程
 
