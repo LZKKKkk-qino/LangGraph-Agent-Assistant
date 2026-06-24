@@ -50,7 +50,7 @@ LangGraph Agent Assistant 是一个基于 LangGraph 框架构建的智能 Agent 
 - **易于部署**：支持云端 API 和本地私有化部署两种模式
 - **可视化调试**：集成 LangSmith 支持，提供工作流可视化调试能力
 
-### 应用场景
+### 应用场景(取决于Agent中的工具支持)
 
 - 智能客服系统
 - 企业知识问答
