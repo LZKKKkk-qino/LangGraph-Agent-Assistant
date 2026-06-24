@@ -232,7 +232,7 @@ async def create_graph():
     builder = StateGraph(State)
 
     # 只在有工具时才绑定工具，避免模型在没有工具时产生意外的工具调用行为
-    llm_with_tools = multimodal_llm.bind_tools(tools,strict=True) if tools else multimodal_llm
+    llm_with_tools = multimodal_llm.bind_tools(tools,strict=True)
 
     async def chatbot(state: State):
         print(f"llm input state:{state}")
