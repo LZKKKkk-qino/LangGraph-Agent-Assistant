@@ -163,5 +163,6 @@ cython_debug/
 uv.lock
 .langgraph_api/
 
-# claude.md
-.CLAUDE.md
+# Claude
+CLAUDE.md
+.claude/
