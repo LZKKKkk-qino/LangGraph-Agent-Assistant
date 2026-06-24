@@ -12,7 +12,7 @@ from langgraph.graph import StateGraph, MessagesState
 from langgraph.types import interrupt, Command
 import gradio as gr
 from get_env import ZHIPU_API_KEY
-from src.agent.my_llm import multimodal_llm
+from src.agent.my_llm import multimodal_llm, llm
 from src.agent.tools.tool_test4 import calculate
 from src.agent.tools.tool_test6 import runnable_tool
 import time
